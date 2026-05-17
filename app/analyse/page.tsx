@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from '@/contexts/AuthContext'
 import { UserMenu } from '@/components/UserMenu'
 import ResultsPage from '@/components/results/ResultsPage'
+import mixpanel from '@/lib/mixpanel'
 
 const DESIGN_ICONS = [
   { id: 1, path: "M3 3h7v7H3zM13 3h7v7h-7zM3 13h7v7H3zM13 13h7v7h-7z" },
@@ -885,6 +886,7 @@ export default function DesignBestie() {
 
   useEffect(() => {
     if (screen !== "analysing") return;
+    mixpanel.track('Analysis Started', { mode: 'analyse' });
     setStep(0);
     setAnalysisResult(null);
     let apiDone = false;
@@ -897,7 +899,10 @@ export default function DesignBestie() {
         const res = await fetch("/api/analyse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType, context }) });
         const json = await res.json();
         if (res.status === 401) { setScreen("home"); openLoginModal(); return; }
-        if (res.ok && json) { setAnalysisResult(json); }
+        if (res.ok && json) {
+          setAnalysisResult(json);
+          mixpanel.track('Analysis Completed', { score: json.overall_score || json.score?.score || 0 });
+        }
         else { setAnalysisResult({ overall_score: 0, scores: { usability: 0, accessibility: 0, visual_design: 0, hierarchy: 0, cognitive_load: 0 }, summary: "Analysis failed — please try again.", issues: [], wins: [], priority_fixes: [] }); }
       } catch (e) {
         setAnalysisResult({ overall_score: 0, scores: { usability: 0, accessibility: 0, visual_design: 0, hierarchy: 0, cognitive_load: 0 }, summary: "Network error — please try again.", issues: [], wins: [], priority_fixes: [] });

@@ -8,6 +8,7 @@ import RoastResults from "./modes/RoastResults";
 import StressResults from "./modes/StressResults";
 import StakeholderResults from "./modes/StakeholderResults";
 import FirstFiveResults from "./modes/FirstFiveResults";
+import mixpanel from "@/lib/mixpanel";
 
 type Mode = "analyse" | "roast" | "stress" | "stakeholder" | "firstfive";
 
@@ -147,10 +148,19 @@ export default function ResultsPage({
 
   const handleTabChange = (mode: Mode) => {
     setActiveTab(mode);
-    if (mode === "roast" && !roastResult && !isRoasting) onRunRoast();
-    else if (mode === "stress" && !stressResult && !isStressing) onRunStress();
-    else if (mode === "stakeholder" && !stakeholderResult && !isStakeholdering) onRunStakeholder();
-    else if (mode === "firstfive" && !firstFiveResult && !isFirstFiving) onRunFirstFive();
+    if (mode === "roast") {
+      mixpanel.track('Roast Clicked');
+      if (!roastResult && !isRoasting) onRunRoast();
+    } else if (mode === "stress") {
+      mixpanel.track('Stress Test Clicked');
+      if (!stressResult && !isStressing) onRunStress();
+    } else if (mode === "stakeholder") {
+      mixpanel.track('Stakeholders Clicked');
+      if (!stakeholderResult && !isStakeholdering) onRunStakeholder();
+    } else if (mode === "firstfive") {
+      mixpanel.track('First 5 Seconds Clicked');
+      if (!firstFiveResult && !isFirstFiving) onRunFirstFive();
+    }
   };
 
   const tabs: { key: Mode; label: string }[] = [
@@ -386,6 +396,16 @@ export default function ResultsPage({
               </motion.div>
             </AnimatePresence>
           </div>
+
+          {/* Give feedback button */}
+          <a
+            href="https://tally.so/r/Y5JYRW"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 justify-center py-3 border-t border-slate-100"
+          >
+            💬 Give feedback
+          </a>
         </main>
       </div>
     </div>
