@@ -177,7 +177,7 @@ export default function ResultsPage({
         <Button
           variant="outline"
           size="sm"
-          onClick={onNewAnalysis}
+          onClick={() => window.location.href = '/'}
           className="rounded-lg border-slate-200 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5a47b0] text-sm"
         >
           ← New Analysis

@@ -5,6 +5,8 @@ import { Playfair_Display } from 'next/font/google'
 import SplashScreen from '@/components/SplashScreen'
 import AnalyseModal from '@/components/AnalyseModal'
 import BriefModal from '@/components/BriefModal'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserMenu } from '@/components/UserMenu'
 
 const SPLASH_KEY = 'designBestiSplashSeen'
 
@@ -447,6 +449,7 @@ function AngledMacBook({ screenContent, mouseX, mouseY }: { screenContent: React
 
 // ── main ──────────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  const { user, openLoginModal } = useAuth()
   const [critiqueText, setCritiqueText]         = useState('')
   const [critiqueMeta, setCritiqueMeta]         = useState('')
   const [critiqueLabel, setCritiqueLabel]       = useState('Analysing a design')
@@ -565,7 +568,11 @@ export default function HomePage() {
       <nav style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 7%',position:'sticky',top:0,zIndex:100,background:'rgba(8,9,15,0.93)',backdropFilter:'blur(20px)',borderBottom:'0.5px solid rgba(255,255,255,0.06)'}}>
         <LogoSVG style={{width:110,height:'auto'}} opacity={0.92}/>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <span style={{fontSize:13,color:'rgba(255,255,255,0.5)',cursor:'pointer'}}>Sign in</span>
+          {user ? (
+            <UserMenu />
+          ) : (
+            <span onClick={openLoginModal} style={{fontSize:13,color:'rgba(255,255,255,0.5)',cursor:'pointer'}}>Sign in</span>
+          )}
           <button style={{fontSize:13,padding:'7px 20px',borderRadius:100,background:'#fff',color:'#08090F',fontWeight:500,cursor:'pointer',border:'none'}}>Try free</button>
         </div>
       </nav>
