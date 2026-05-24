@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calculateUXScore } from "@/lib/scoringEngine";
 import { getBenchmark } from "@/lib/benchmarkEngine";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
@@ -12,6 +13,83 @@ export async function POST(req: NextRequest) {
 
     if (!ANTHROPIC_API_KEY) {
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
+    }
+
+    // Check usage limits
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      // Guest user - check x-usage-count header
+      const guestCount = parseInt(req.headers.get('x-usage-count') || '0', 10);
+      if (guestCount >= 7) {
+        return NextResponse.json(
+          { error: 'limit_reached', type: 'guest', limit: 7 },
+          { status: 429 }
+        );
+      }
+    } else {
+      // Logged-in user - check Supabase usage table
+      const { data: usage, error: fetchError } = await supabase
+        .from('usage')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Usage fetch error:', fetchError);
+      }
+
+      const now = new Date();
+      let currentUsage = usage;
+
+      if (!currentUsage) {
+        // Create new usage record
+        const { data: newUsage, error: createError } = await supabase
+          .from('usage')
+          .insert({
+            user_id: user.id,
+            count: 0,
+            reset_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Usage create error:', createError);
+        } else {
+          currentUsage = newUsage;
+        }
+      } else {
+        // Check if reset_at is in the past
+        const resetAt = new Date(currentUsage.reset_at);
+        if (resetAt < now) {
+          // Reset count
+          const { data: updatedUsage, error: updateError } = await supabase
+            .from('usage')
+            .update({
+              count: 0,
+              reset_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('user_id', user.id)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('Usage reset error:', updateError);
+          } else {
+            currentUsage = updatedUsage;
+          }
+        }
+      }
+
+      // Check limit
+      if (currentUsage && currentUsage.count >= 14) {
+        return NextResponse.json(
+          { error: 'limit_reached', type: 'free', limit: 14 },
+          { status: 429 }
+        );
+      }
     }
 
     const contextBlock =
@@ -96,6 +174,14 @@ CRITICAL: Every zone field must use only the 9 allowed values listed above. Defa
 
     const uxScore = calculateUXScore(scoringIssues);
     const benchmark = getBenchmark(uxScore.score, result.issues || []);
+
+    // Increment usage count for logged-in users
+    if (user) {
+      await supabase
+        .from('usage')
+        .update({ count: supabase.raw('count + 1') })
+        .eq('user_id', user.id);
+    }
 
     return NextResponse.json({
       score: uxScore,

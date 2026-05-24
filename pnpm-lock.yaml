@@ -5632,7 +5632,7 @@ snapshots:
       mime-db: 1.54.0
       neo-async: 2.6.2
       schema-utils: 4.3.3
-      tapable: 2.3.0
+      tapable: 2.3.3
       terser-webpack-plugin: 5.6.0(postcss@8.5.6)(webpack@5.106.2(postcss@8.5.6))
       watchpack: 2.5.1
       webpack-sources: 3.4.1

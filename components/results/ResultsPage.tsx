@@ -8,6 +8,7 @@ import RoastResults from "./modes/RoastResults";
 import StressResults from "./modes/StressResults";
 import StakeholderResults from "./modes/StakeholderResults";
 import FirstFiveResults from "./modes/FirstFiveResults";
+import UsageCounter from "@/components/UsageCounter";
 import mixpanel from "@/lib/mixpanel";
 
 type Mode = "analyse" | "roast" | "stress" | "stakeholder" | "firstfive";
@@ -184,14 +185,17 @@ export default function ResultsPage({
             <span style={{ color: '#5a47b0' }}>besti</span>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.location.href = '/'}
-          className="rounded-lg border-slate-200 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5a47b0] text-sm"
-        >
-          ← New Analysis
-        </Button>
+        <div className="flex items-center gap-3">
+          <UsageCounter />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.href = '/'}
+            className="rounded-lg border-slate-200 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5a47b0] text-sm"
+          >
+            ← New Analysis
+          </Button>
+        </div>
       </header>
 
       {/* Two column layout */}

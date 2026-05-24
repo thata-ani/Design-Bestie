@@ -840,10 +840,16 @@ export default function DesignBestie() {
   const [firstFiveBlurred, setFirstFiveBlurred] = useState<boolean>(false);
   const [isFirstFiving, setIsFirstFiving] = useState(false);
   const [selectedMode, setSelectedMode] = useState<"analyse" | "stress" | "roast" | "firstfive">("analyse");
+  const [guestCount, setGuestCount] = useState(0);
+  const [limitReached, setLimitReached] = useState<{ type: 'guest' | 'free'; limit: number } | null>(null);
 
   useEffect(() => {
     if (loading || bootstrappedRef.current) return;
     bootstrappedRef.current = true;
+
+    // Initialize guest usage count from localStorage
+    const storedCount = typeof window !== "undefined" ? localStorage.getItem("designBestiGuestCount") : null;
+    setGuestCount(storedCount ? parseInt(storedCount, 10) : 0);
 
     const pendingAnalyse = typeof window !== "undefined" ? sessionStorage.getItem("designBestiPendingAnalyse") : null;
     const pendingBrief = typeof window !== "undefined" ? sessionStorage.getItem("designBestiPendingBrief") : null;
@@ -896,12 +902,26 @@ export default function DesignBestie() {
       try {
         const base64 = imagePreview!.split(",")[1];
         const mimeType = imagePreview!.split(";")[0].split(":")[1];
-        const res = await fetch("/api/analyse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType, context }) });
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (!user) headers["x-usage-count"] = String(guestCount);
+        const res = await fetch("/api/analyse", { method: "POST", headers, body: JSON.stringify({ imageBase64: base64, mimeType, context }) });
         const json = await res.json();
         if (res.status === 401) { setScreen("home"); openLoginModal(); return; }
+        if (res.status === 429 && json.error === 'limit_reached') {
+          console.log('limit reached', json);
+          setLimitReached({ type: json.type, limit: json.limit });
+          setScreen("home");
+          return;
+        }
         if (res.ok && json) {
           setAnalysisResult(json);
           mixpanel.track('Analysis Completed', { score: json.overall_score || json.score?.score || 0 });
+          // Increment guest count after successful analysis
+          if (!user) {
+            const newCount = guestCount + 1;
+            setGuestCount(newCount);
+            localStorage.setItem("designBestiGuestCount", String(newCount));
+          }
         }
         else { setAnalysisResult({ overall_score: 0, scores: { usability: 0, accessibility: 0, visual_design: 0, hierarchy: 0, cognitive_load: 0 }, summary: "Analysis failed — please try again.", issues: [], wins: [], priority_fixes: [] }); }
       } catch (e) {
@@ -1044,24 +1064,63 @@ export default function DesignBestie() {
 
   if (screen === "home") {
     return (
-      <HomeScreen
-        onStart={() => {
-          if (!user) { openLoginModal(); return; }
-          if (uploaded && imagePreview) { setActiveTab("analysis"); setAnalysisResult(null); setStressResult(null); setRoastResult(null); setScreen("analysing"); } else fileInputRef.current?.click();
-        }}
-        onBrief={() => {
-          if (!user) { openLoginModal(); return; }
-          if (briefText.trim().length > 10) setScreen("briefing");
-        }}
-        onLaunchFirstFive={launchFirstFive}
-        selectedMode={selectedMode}
-        setSelectedMode={setSelectedMode}
-        briefText={briefText}
-        setBriefText={setBriefText}
-        uploaded={uploaded} fileName={fileName} imagePreview={imagePreview}
-        fileInputRef={fileInputRef} isDragging={isDragging} setIsDragging={setIsDragging}
-        handleInputChange={handleInputChange} handleDrop={handleDrop}
-      />
+      <>
+        <HomeScreen
+          onStart={() => {
+            if (!user) { openLoginModal(); return; }
+            if (uploaded && imagePreview) { setActiveTab("analysis"); setAnalysisResult(null); setStressResult(null); setRoastResult(null); setScreen("analysing"); } else fileInputRef.current?.click();
+          }}
+          onBrief={() => {
+            if (!user) { openLoginModal(); return; }
+            if (briefText.trim().length > 10) setScreen("briefing");
+          }}
+          onLaunchFirstFive={launchFirstFive}
+          selectedMode={selectedMode}
+          setSelectedMode={setSelectedMode}
+          briefText={briefText}
+          setBriefText={setBriefText}
+          uploaded={uploaded} fileName={fileName} imagePreview={imagePreview}
+          fileInputRef={fileInputRef} isDragging={isDragging} setIsDragging={setIsDragging}
+          handleInputChange={handleInputChange} handleDrop={handleDrop}
+        />
+        {limitReached && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div style={{ background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)", borderRadius: 20, padding: 40, maxWidth: 480, width: "100%", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontSize: 48, marginBottom: 16, textAlign: "center" }}>🚀</div>
+              <h3 style={{ fontSize: 24, fontWeight: 700, color: "#fff", margin: "0 0 12px", textAlign: "center" }}>
+                {limitReached.type === 'guest' ? 'Free analyses used!' : 'Monthly limit reached'}
+              </h3>
+              <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", margin: "0 0 24px", textAlign: "center", lineHeight: 1.6 }}>
+                {limitReached.type === 'guest'
+                  ? `You've used all ${limitReached.limit} free guest analyses. Sign in to get 14 analyses per month.`
+                  : `You've used all ${limitReached.limit} analyses this month. Your limit resets in 30 days from first use. Upgrade to Pro for unlimited analyses.`
+                }
+              </p>
+              <div style={{ display: "flex", gap: 12 }}>
+                {limitReached.type === 'guest' ? (
+                  <>
+                    <button onClick={() => { setLimitReached(null); openLoginModal(); }} style={{ flex: 1, background: "linear-gradient(135deg,#2563EB,#0EA5E9)", border: "none", color: "#fff", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
+                      Sign In
+                    </button>
+                    <button onClick={() => setLimitReached(null)} style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.85)", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                      Close
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setLimitReached(null)} style={{ flex: 1, background: "linear-gradient(135deg,#2563EB,#0EA5E9)", border: "none", color: "#fff", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
+                      Upgrade to Pro
+                    </button>
+                    <button onClick={() => setLimitReached(null)} style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.85)", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                      Close
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
