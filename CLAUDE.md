@@ -2,39 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project
 
-**Design Besti** — AI design critique tool  
-**Website**: designbesti.com  
-**Tagline**: "The senior design partner you can't afford"  
-**Repository**: github.com/thata-ani/design-bestie
-
-Design Besti analyzes UI screenshots and provides professional design feedback across multiple modes: UX Audit, Roast Mode, Stress Test, Stakeholder Translator, Brief Mode, and First 5 Seconds Test.
-
-## Stack
-
-- **Next.js 16** App Router + React 19 + TypeScript
-- **Vercel** — free tier deployment
-- **Claude Haiku 4.5** — `claude-haiku-4-5-20251001` (NEVER use Sonnet — causes 504 timeouts)
-- **Supabase** — auth + database (Google OAuth)
-- **pnpm** — package manager (NEVER use npm or yarn)
-- **Anthropic Messages API** — direct fetch calls, no SDK
-- **Framer Motion** — animations
-- **shadcn/ui** — UI components ("new-york" style, lucide icons)
-- **Tailwind v4** — styling with `@tailwindcss/postcss`
-- **Lenis** — smooth scroll (homepage)
-- **GSAP + ScrollTrigger** — scroll animations (homepage)
-- **Microsoft Clarity** — analytics (ID: wsdruf81ub)
-
-Path alias `@/*` maps to repo root.
+Design Besti (designbesti.com) — AI-powered design critique tool. "The senior design partner you can't afford." Repo: github.com/thata-ani/design-bestie. Live: designbesti.com.
 
 ## Critical Rules
 
-1. **ALWAYS use Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) — Sonnet causes 504 timeouts
+1. **ALWAYS use Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) — Sonnet causes 504 timeouts on Vercel free tier
 2. **ALWAYS use pnpm** — never npm or yarn
 3. **Test on localhost before pushing** — verify changes locally first
-4. **Git tag before major changes** — create tags for significant releases
-5. **Scores ALWAYS come from scoringEngine.ts** — never use Claude's score directly
+4. **Git tag working states** before major changes (pattern: `working-backup-may27`)
+5. **.claude/ in .gitignore** — never commit Claude Code memory/state
+
+## Stack
+
+Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui, Supabase auth + db + storage, Google OAuth, pnpm, Anthropic API, Framer Motion, Lenis, GSAP
+
+Path alias `@/*` maps to repo root.
 
 ## Commands
 
@@ -45,7 +29,7 @@ Path alias `@/*` maps to repo root.
 
 `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so `pnpm build` will succeed even with TS errors. To type-check, run `pnpm exec tsc --noEmit` separately.
 
-## Required Environment Variables
+## Environment Variables
 
 All three are required. The Supabase ones are read on both client and server; `ANTHROPIC_API_KEY` is server-only.
 
@@ -53,49 +37,83 @@ All three are required. The Supabase ones are read on both client and server; `A
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `ANTHROPIC_API_KEY`
 
+## Supabase
+
+**Project ID**: kaqrfaoqfxniqelemiyq
+
+**Tables**:
+- `usage` — tracks analysis usage per user
+- `battles` — battle metadata (creator, challenger, status, winner)
+- `battle_messages` — battle roasts and defenses
+
+**Storage**:
+- `battle-images` bucket (public) — stores battle uploads
+
+## Third-Party Integrations
+
+- **Microsoft Clarity** — ID: `wsdruf81ub`, script in `app/layout.tsx`
+- **Mixpanel** — token: `aa410ec7b476534151c51328e2dc82cc`, `lib/mixpanel.ts`, `components/MixpanelProvider.tsx`
+- **Sentry** — DSN: `https://77f6ee0780da50618a3a153c72219d58@o4511403839979520.ingest.us.sentry.io/4511403846860800`
+- **Tally feedback** — form: `https://tally.so/r/Y5JYRW`, button on results page
+- **OneSignal** — App ID: `9c3de50e-e4e1-4667-b3a1-f254def319c2`, service worker in `/public/OneSignalSDKWorker.js`
+
+## Pricing Model
+
+- **Guest (not logged in)**: 7 free analyses (localStorage key: `designBestiGuestCount`)
+- **Free logged in**: 14 analyses/month (Supabase `usage` table)
+- **Pro**: $9/month, unlimited (Stripe — not yet integrated)
+
 ## Features Built
 
 ### Core Analysis
 - UX Audit with score, issues, wins, reading patterns, benchmark
-- Score animation (count-up effect)
-- Category breakdown rings (5 categories: Usability, Accessibility, Visual, Hierarchy, Cognitive)
-- Zone-based issue highlighting on uploaded design
-- Issue cards with expand/collapse
-- Priority fixes section
+- Stress Test (7 user personas)
+- Roast Mode (brutal feedback)
+- Stakeholder Translator (business risks, ROI matrix)
+- Brief Mode (requirement → screens/states/edge cases)
+- First 5 Seconds Test (first impression analysis)
 
-### Additional Modes
-- **Roast Mode** — brutal, no-holds-barred feedback
-- **Stress Test** — 7 user personas (first-timer, power user, accessibility user, older user, distracted user, mobile user, non-native speaker)
-- **Stakeholder Translator** — converts UX issues into business risks, ROI matrix, sprint-ready tickets
-- **Brief Mode** — paste requirements, get screens, states, edge cases, questions to ask
-- **First 5 Seconds Test** — captures first impression, noticed/missed elements, attention score
+### Results Page
+`components/results/ResultsPage.tsx` — white theme, 35/65 split, zone-based click highlight, category rings, score animation. Mode components in `components/results/modes/`.
+
+### Auth & Usage
+- Google OAuth via Supabase (`contexts/AuthContext.tsx`)
+- LoginModal mounted at root in `app/layout.tsx`
+- UserMenu shown in all navbars when logged in
+- UsageCounter component + pricing modal (`components/UsageCounter.tsx`, shows on all navbars)
+- Private beta whitelist: `ALLOWED_EMAILS` in `middleware.ts` (currently: anirudh.thata@gmail.com)
+
+### Design Roast Battle
+Full feature: create, join, roast, defend, verdict. Battle page at `/battle/[slug]`. Lottie animations in `/public/`:
+- `battle-waiting.json`, `battle-starting.json`, `battle-roasting.json`, `battle-defense.json`, `battle-ai-responds.json`, `battle-verdict.json`, `battle-winner.json`, `battle-loser.json`
+
+Battle APIs: `app/api/battle/` (create, join, roast, defend, verdict). Supabase storage for images (`battle-images` bucket).
+
+### Analytics
+Microsoft Clarity, Mixpanel, Sentry, Tally, OneSignal all integrated.
 
 ### UI/UX
-- **Homepage** — `app/page.tsx` with BlastCanvas particles, 3D parallax hero, critique typewriter, scroll-snap service cards
-- **Splash Screen** — first-visit-only, multilingual cycling words, logo reveal, zoom dissolve (persisted in sessionStorage)
-- **Results Page** — `components/results/ResultsPage.tsx`
-  - White theme, 35/65 left/right split
-  - Left: score block, category rings, uploaded image with zone highlights
-  - Right: verdict, mode tabs, scrollable content
-  - Zone-based highlighting using ZONE_HIGHLIGHT (3×3 grid) and ZONE_POSITIONS
-  - Numbered dots on image for each issue
-  - Click issue card → highlight zone + scroll to dot
+- **Homepage** (`app/page.tsx`) — BlastCanvas particles, 3D parallax hero, critique typewriter, scroll-snap service cards
+- **Splash Screen** (`components/SplashScreen.tsx`) — first-visit-only, multilingual cycling words, logo reveal (persisted in sessionStorage)
 - **Modal System** — `AnalyseModal.tsx` and `BriefModal.tsx` with dark-glass theme, drag/drop upload
 - **No-flash transitions** — black-screen handoff between homepage and /analyse
 
-### Auth & User
-- **Google OAuth** via Supabase
-- **AuthContext** — `contexts/AuthContext.tsx`
-- **LoginModal** — mounted at root in `app/layout.tsx`
-- **UserMenu** — shown in all navbars when logged in
-- **Private beta whitelist** — `ALLOWED_EMAILS` in `middleware.ts` (currently: anirudh.thata@gmail.com)
+## Key File Locations
 
-### Analytics & Tracking
-- **Microsoft Clarity** — tracking script in `app/layout.tsx` (ID: wsdruf81ub)
-- **Vercel Analytics** — production only
-
-### Placeholders
-- **Announcement bar** — placeholder ready for implementation
+- **Homepage**: `app/page.tsx`
+- **Audit tool**: `app/analyse/page.tsx`
+- **Results page**: `components/results/ResultsPage.tsx`
+- **Mode components**: `components/results/modes/`
+- **Usage counter + pricing modal**: `components/UsageCounter.tsx`
+- **Battle page**: `app/battle/[slug]/page.tsx`
+- **Battle APIs**: `app/api/battle/`
+- **Analysis API**: `app/api/analyse/route.ts`
+- **Scoring engine**: `lib/scoringEngine.ts`
+- **Benchmark engine**: `lib/benchmarkEngine.ts`
+- **Analytics**: `lib/mixpanel.ts`, `components/MixpanelProvider.tsx`
+- **Auth middleware**: `middleware.ts` (ALLOWED_EMAILS whitelist array)
+- **Supabase browser client**: `lib/supabase/client.ts`
+- **Supabase server client**: `lib/supabase/server.ts`
 
 ## Architecture
 
@@ -193,77 +211,46 @@ Three independent dark-cover gates ensure no homepage frame is visible after mod
 
 Touching any of these three gates — modal `navigating`, layout body bg, or `/analyse` `bootChecked` — risks reintroducing the flash.
 
-## Pricing
+## Vercel
 
-**Free Tier**: 3 analyses (testing phase)  
-**Starter**: $9/month — 30 analyses  
-**Pro**: $19/month — unlimited analyses
+vercel.com/anirudhthata-3305s-projects/design-bestie
 
-Pro-only features (to be locked):
-- Roast Mode
-- Stress Test
-- Stakeholder Translator
-- First 5 Seconds Test
+## Whitelist Email
 
-## Immediate Priorities
+anirudh.thata@gmail.com
 
-1. **3 free analyses limit + paywall modal**
-2. **Lock Pro features** (Roast, Stress, Stakeholders, First 5s)
-3. **Prompt rewrite for consistent results** (determinism)
-4. **Mixpanel analytics**
-5. **Sentry error tracking**
-6. **Tally feedback button**
-7. **OneSignal push notifications**
-8. **Announcement bar** (implementation)
-9. **Stripe payment integration**
-10. **SEO optimization**
-11. **Product Hunt launch**
-12. **Email automation**
-13. **Shareable results card**
+## Immediate Priorities (in order)
 
-## Future Feature Roadmap
+1. **Lock Pro features** — Roast, Stress, Stakeholders, First 5s, Roast Battle show locked for free users
+2. **Stripe payment integration**
+3. **Prompt rewrite** — consistent results, same image = same issues
+4. **SEO** — meta tags, og images, sitemap
+5. **Product Hunt launch prep**
+6. **Email automation** — AI agent for newsletters, no manual input
+7. **Social media automation** — AI agent for posts and promotions
+8. **Announcement bar**
+9. **Shareable results card**
 
-- **Debate Mode** — argue with the AI about design decisions
-- **Conversion Predictor** — multi-screen upload, predict conversion flow
-- **Design Memory** — version comparison, track design evolution
-- **Presentation Generator** — export to PDF + PPTX
-- **Design Roast Battle** — competitive design critique
-- **Brief Translator for PMs** — translate PM-speak to design requirements
-- **Design Trend Detector** — identify trends in uploaded designs
-- **Design DNA** — unique design fingerprint analysis
-- **Accessibility Lawsuit Risk Score** — legal compliance assessment
-- **Honest Portfolio Reviewer** — brutal portfolio feedback
-- **Figma plugin** — analyze designs directly from Figma
-- **Team collaboration** — shared workspaces, comments
-- **Hand Gesture Control** — MediaPipe integration for gesture-based navigation
-- **Homepage redesign** — refresh landing page experience
+## Feature Roadmap
 
-## Marketing Automation
+- **Conversion Predictor** — multi-screen upload, predicts drop-off
+- **Design Memory** — version comparison
+- **Accessibility Lawsuit Risk Score**
+- **Design Trend Detector**
+- **Honest Portfolio Reviewer**
+- **Presentation Generator** — analysis to PDF + PPTX deck
+- **Figma plugin**
+- **Hand Gesture Control** — wave to navigate slides (MediaPipe)
+- **Debate Mode**
+- **Brief Translator for PMs**
+- **Design DNA**
 
-### AI Newsletter Agent
-- Fully automated newsletter generation and scheduling
-- No manual input required
-- Scheduled sends based on content calendar
+## Infrastructure Roadmap
 
-### AI Social Media Agent
-- Automated social media posts and promotions
-- Cross-platform distribution (Twitter, LinkedIn, etc.)
-- Content generated based on product updates and analytics
-- Fully autonomous operation
-
-## Tools Installed
-
-- **UI/UX Pro Max plugin** — design standards database (50+ styles, 161 color palettes, 57 font pairings, 99 UX guidelines)
-- **21st.dev Magic MCP** — needs API key fix
-- **Framer Motion** — animation library
-- **shadcn/ui** — component library
-
-## Deployment
-
-**Vercel**: vercel.com/anirudhthata-3305s-projects/design-bestie  
-**Supabase Project ID**: kaqrfaoqfxniqelemiyq  
-**Whitelist Email**: anirudh.thata@gmail.com
+- **Figma MCP integration** — design system checking (post-paywall Pro only)
+- **Team collaboration**
+- **Jira + Notion integration**
 
 ## Session Log
 
-**2026-05-17**: Results page redesign complete — zone-based highlighting with ZONE_HIGHLIGHT/ZONE_POSITIONS, click-to-highlight with scroll-to-dot, category rings animation, white theme 35/65 split. Added Microsoft Clarity tracking (ID: wsdruf81ub). Prompt improvements for deterministic zone values. UserMenu added to all navbars. Scores now always come from scoringEngine.ts. Type normalization added to /api/analyse route.
+**2026-05-27**: Design Roast Battle complete — full feature with create, join, roast, defend, verdict flow. Battle page at /battle/[slug] with white theme, Lottie animations, expandable roast messages, WinnerCertificate with watermark + trophy seal. Supabase storage for battle images. All analytics integrated (Clarity, Mixpanel, Sentry, Tally, OneSignal). UsageCounter + pricing modal live on all navbars. CLAUDE.md rewritten with current state.
